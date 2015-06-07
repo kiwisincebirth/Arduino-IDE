@@ -25,13 +25,14 @@ package processing.app.macosx;
 import cc.arduino.packages.BoardPort;
 import com.apple.eio.FileManager;
 import org.apache.commons.exec.CommandLine;
+import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.Executor;
+import org.apache.commons.exec.PumpStreamHandler;
+import org.apache.commons.lang3.StringUtils;
 import processing.app.debug.TargetPackage;
 import processing.app.legacy.PApplet;
 import processing.app.legacy.PConstants;
-import processing.app.tools.CollectStdOutExecutor;
 
-import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.lang.reflect.Method;
@@ -45,6 +46,8 @@ import java.util.List;
  */
 public class Platform extends processing.app.Platform {
 
+  private String osArch;
+
   public void setLookAndFeel() throws Exception {
   }
 
@@ -54,35 +57,21 @@ public class Platform extends processing.app.Platform {
     Toolkit.getDefaultToolkit();
   }
 
-  public void init() {
+  public void init() throws IOException {
+    super.init();
+
     System.setProperty("apple.laf.useScreenMenuBar", "true");
-    /*
-    try {
-      String name = "processing.app.macosx.ThinkDifferent";
-      Class osxAdapter = ClassLoader.getSystemClassLoader().loadClass(name);
 
-      Class[] defArgs = { Base.class };
-      Method registerMethod = osxAdapter.getDeclaredMethod("register", defArgs);
-      if (registerMethod != null) {
-        Object[] args = { this };
-        registerMethod.invoke(osxAdapter, args);
-      }
-    } catch (NoClassDefFoundError e) {
-      // This will be thrown first if the OSXAdapter is loaded on a system without the EAWT
-      // because OSXAdapter extends ApplicationAdapter in its def
-      System.err.println("This version of Mac OS X does not support the Apple EAWT." +
-                         "Application Menu handling has been disabled (" + e + ")");
+    discoverRealOsArch();
+  }
 
-    } catch (ClassNotFoundException e) {
-      // This shouldn't be reached; if there's a problem with the OSXAdapter
-      // we should get the above NoClassDefFoundError first.
-      System.err.println("This version of Mac OS X does not support the Apple EAWT. " +
-                         "Application Menu handling has been disabled (" + e + ")");
-    } catch (Exception e) {
-      System.err.println("Exception while loading BaseOSX:");
-      e.printStackTrace();
-    }
-    */
+  private void discoverRealOsArch() throws IOException {
+    CommandLine uname = CommandLine.parse("uname -m");
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    Executor executor = new DefaultExecutor();
+    executor.setStreamHandler(new PumpStreamHandler(baos, null));
+    executor.execute(uname);
+    osArch = StringUtils.trim(new String(baos.toByteArray()));
   }
 
 
@@ -110,7 +99,7 @@ public class Platform extends processing.app.Platform {
 
   public void openURL(String url) throws Exception {
     if (PApplet.javaVersion < 1.6f) {
-      if (url.startsWith("http://")) {
+      if (url.startsWith("http")) {
         // formerly com.apple.eio.FileManager.openURL(url);
         // but due to deprecation, instead loading dynamically
         try {
@@ -134,7 +123,7 @@ public class Platform extends processing.app.Platform {
 
         // for Java 1.6, replacing with java.awt.Desktop.browse() 
         // and java.awt.Desktop.open()
-        if (url.startsWith("http://")) {  // browse to a location
+        if (url.startsWith("http")) {  // browse to a location
           Method browseMethod =
             desktopClass.getMethod("browse", new Class[] { URI.class });
           browseMethod.invoke(desktop, new Object[] { new URI(url) });
@@ -206,6 +195,7 @@ public class Platform extends processing.app.Platform {
 
   @Override
   public Map<String, Object> resolveDeviceAttachedTo(String serial, Map<String, TargetPackage> packages, String devicesListOutput) {
+    assert packages != null;
     if (devicesListOutput == null) {
       return super.resolveDeviceAttachedTo(serial, packages, devicesListOutput);
     }
@@ -226,7 +216,8 @@ public class Platform extends processing.app.Platform {
   @Override
   public String preListAllCandidateDevices() {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    Executor executor = new CollectStdOutExecutor(baos);
+    Executor executor = new DefaultExecutor();
+    executor.setStreamHandler(new PumpStreamHandler(baos, null));
 
     try {
       CommandLine toDevicePath = CommandLine.parse("/usr/sbin/system_profiler SPUSBDataType");
@@ -245,11 +236,16 @@ public class Platform extends processing.app.Platform {
 
     List<BoardPort> filteredPorts = new LinkedList<BoardPort>();
     for (BoardPort port : ports) {
-      if (!port.getAddress().startsWith("/dev/cu.")) {
+      if (!port.getAddress().startsWith("/dev/tty.")) {
         filteredPorts.add(port);
       }
     }
 
     return filteredPorts;
+  }
+
+  @Override
+  public String getOsArch() {
+    return osArch;
   }
 }

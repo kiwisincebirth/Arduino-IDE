@@ -33,6 +33,7 @@ import cc.arduino.packages.BoardPort;
 import cc.arduino.packages.Discovery;
 import cc.arduino.packages.discoverers.network.BoardReachabilityFilter;
 import cc.arduino.packages.discoverers.network.NetworkChecker;
+import org.apache.commons.compress.utils.IOUtils;
 import processing.app.BaseNoGui;
 import processing.app.helpers.PreferencesMap;
 import processing.app.zeroconf.jmdns.ArduinoDNSTaskStarter;
@@ -44,6 +45,8 @@ import java.net.InetAddress;
 import java.util.*;
 
 public class NetworkDiscovery implements Discovery, ServiceListener, cc.arduino.packages.discoverers.network.NetworkTopologyListener {
+
+  private static final int MAX_TIME_AWAITING_FOR_PACKAGES = 5000;
 
   private final List<BoardPort> boardPortsDiscoveredWithJmDNS;
   private final Map<InetAddress, JmDNS> mappedJmDNSs;
@@ -121,6 +124,16 @@ public class NetworkDiscovery implements Discovery, ServiceListener, cc.arduino.
 
   @Override
   public void serviceResolved(ServiceEvent serviceEvent) {
+    int sleptFor = 0;
+    while (BaseNoGui.packages == null && sleptFor <= MAX_TIME_AWAITING_FOR_PACKAGES) {
+      try {
+        Thread.sleep(1000);
+        sleptFor += 1000;
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }
+
     ServiceInfo info = serviceEvent.getInfo();
     for (InetAddress inetAddress : info.getInet4Addresses()) {
       String address = inetAddress.getHostAddress();
@@ -137,7 +150,7 @@ public class NetworkDiscovery implements Discovery, ServiceListener, cc.arduino.
       }
 
       String label = name + " at " + address;
-      if (board != null) {
+      if (board != null && BaseNoGui.packages != null) {
         String boardName = BaseNoGui.getPlatform().resolveDeviceByBoardID(BaseNoGui.packages, board);
         if (boardName != null) {
           label += " (" + boardName + ")";
@@ -187,12 +200,6 @@ public class NetworkDiscovery implements Discovery, ServiceListener, cc.arduino.
   @Override
   public void inetAddressRemoved(InetAddress address) {
     JmDNS jmDNS = mappedJmDNSs.remove(address);
-    if (jmDNS != null) {
-      try {
-        jmDNS.close();
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
+    IOUtils.closeQuietly(jmDNS);
   }
 }

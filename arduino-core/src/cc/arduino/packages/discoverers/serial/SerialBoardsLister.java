@@ -39,9 +39,9 @@ import processing.app.helpers.PreferencesMap;
 
 import java.util.*;
 
-import static processing.app.I18n._;
-
 public class SerialBoardsLister extends TimerTask {
+
+  private static final int MAX_TIME_AWAITING_FOR_PACKAGES = 5000;
 
   private final SerialDiscovery serialDiscovery;
 
@@ -55,6 +55,16 @@ public class SerialBoardsLister extends TimerTask {
 
   @Override
   public void run() {
+    int sleptFor = 0;
+    while (BaseNoGui.packages == null && sleptFor <= MAX_TIME_AWAITING_FOR_PACKAGES) {
+      try {
+        Thread.sleep(1000);
+        sleptFor += 1000;
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }
+
     Platform platform = BaseNoGui.getPlatform();
     if (platform == null) {
       return;
@@ -86,17 +96,9 @@ public class SerialBoardsLister extends TimerTask {
 
         TargetBoard board = (TargetBoard) boardData.get("board");
         if (board != null) {
-          String warningKey = "vid." + boardData.get("vid").toString() + ".warning";
-          String warning = board.getPreferences().get(warningKey);
-          prefs.put("warning", warning);
-
           String boardName = board.getName();
           if (boardName != null) {
-            if (warning != null) {
-              label += " (" + boardName + " - " + _(warning) + ")";
-            } else {
-              label += " (" + boardName + ")";
-            }
+            label += " (" + boardName + ")";
           }
           boardPort.setBoardName(boardName);
         }

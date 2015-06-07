@@ -39,10 +39,13 @@ build/linux/work/
 build/linux/dist/*.tar.gz
 build/linux/dist/*.tar.bz2
 build/linux/*.tgz
+build/linux/*.tar.xz
 build/linux/*.tar.bz2
 build/linux/*.zip
 build/linux/libastylej*
 build/shared/reference*.zip
+build/shared/Edison*.zip
+build/shared/Galileo*.zip
 test-bin
 *.iml
 .idea
@@ -50,3 +53,11 @@ test-bin
 .directory
 hardware/arduino/avr/libraries/Bridge/examples/XivelyClient/passwords.h
 avr-toolchain-*.zip
+/app/nbproject/private/
+/arduino-core/nbproject/private/
+/app/build/
+/arduino-core/build/
+
+manifest.mf
+nbbuild.xml
+nbproject
